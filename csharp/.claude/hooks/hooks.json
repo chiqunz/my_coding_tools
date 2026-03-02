@@ -1,0 +1,45 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/block-sensitive-reads.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": {
+          "tool_name": "Write",
+          "file_paths": ["**.cs"]
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dotnet format --include \"$CLAUDE_FILE_PATH\" --verbosity quiet",
+            "timeout": 30000,
+            "on_failure": "continue"
+          }
+        ]
+      }
+    ],
+    "PreCommit": [
+      {
+        "matcher": {},
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dotnet build --no-restore --verbosity quiet && dotnet test --no-build --verbosity quiet",
+            "timeout": 180000,
+            "on_failure": "stop"
+          }
+        ]
+      }
+    ]
+  }
+}
