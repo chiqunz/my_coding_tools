@@ -1,0 +1,5 @@
+{
+  "name": "quant-strategy-miner",
+  "version": "1.0.0",
+  "description": "Discover and design quantitative trading strategies for mid-term holding periods (days to months). Factor research, alpha mining, regime-aware strategy construction."
+}
