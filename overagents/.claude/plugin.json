@@ -1,0 +1,18 @@
+{
+  "name": "dev-loop",
+  "version": "0.1.0",
+  "description": "Automated bug discovery, prompt auditing, triage, and implementation pipeline",
+  "author": "chizhang",
+  "agents": [
+    "agents/bug-scanner.md",
+    "agents/prompt-auditor.md",
+    "agents/issue-validator.md",
+    "agents/issue-implementer.md",
+    "agents/code-reviewer.md"
+  ],
+  "skills": [
+    "skills/github-issue-ops",
+    "skills/post-turn-step"
+  ],
+  "hooks": "hooks/hooks.json"
+}
