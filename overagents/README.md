@@ -96,31 +96,33 @@ tail -f logs/triage.log
 Add to your crontab (`crontab -e`):
 
 ```cron
-# dev-loop pipeline
+# dev-loop pipeline (source API key from a secrets file)
 # Stage 1: Bug scanner — nightly at 2 AM
-0 2 * * * ANTHROPIC_API_KEY=sk-ant-xxx /path/to/repo/scripts/run-bug-scanner.sh
+0 2 * * * source /etc/dev-loop-secrets && /path/to/repo/scripts/run-bug-scanner.sh
 
 # Stage 2: Prompt auditor — nightly at 3 AM
-0 3 * * * ANTHROPIC_API_KEY=sk-ant-xxx /path/to/repo/scripts/run-prompt-auditor.sh
+0 3 * * * source /etc/dev-loop-secrets && /path/to/repo/scripts/run-prompt-auditor.sh
 
 # Stage 3: Triage / validator — every hour on the hour
-0 * * * * ANTHROPIC_API_KEY=sk-ant-xxx /path/to/repo/scripts/run-triage.sh
+0 * * * * source /etc/dev-loop-secrets && /path/to/repo/scripts/run-triage.sh
 
 # Stage 4: Implementer — every hour at :30
-30 * * * * ANTHROPIC_API_KEY=sk-ant-xxx /path/to/repo/scripts/run-implement.sh
+30 * * * * source /etc/dev-loop-secrets && /path/to/repo/scripts/run-implement.sh
 ```
+
+Create `/etc/dev-loop-secrets` with `export ANTHROPIC_API_KEY=sk-ant-xxx` and `chmod 600` it.
 
 ### API Key Options
 
 ```bash
-# Option A: inline in crontab (simplest, shown above)
-0 2 * * * ANTHROPIC_API_KEY=sk-ant-xxx /path/to/scripts/run-bug-scanner.sh
-
-# Option B: source from a secrets file
+# Option A: source from a secrets file (recommended, shown above)
 0 2 * * * source /etc/dev-loop-secrets && /path/to/scripts/run-bug-scanner.sh
 
-# Option C: use a secrets manager wrapper
+# Option B: use a secrets manager wrapper
 0 2 * * * /path/to/scripts/load-secrets-and-run.sh bug-scanner
+
+# Option C: inline in crontab (not recommended — key visible in crontab)
+0 2 * * * ANTHROPIC_API_KEY=sk-ant-xxx /path/to/scripts/run-bug-scanner.sh
 ```
 
 ## Manual Execution

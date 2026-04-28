@@ -3,6 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_DIR="$SCRIPT_DIR"
+mkdir -p "$REPO_DIR/logs"
 LOG_FILE="$REPO_DIR/logs/implement.log"
 LOCK_FILE="/tmp/dev-loop-implement.lock"
 PROMPT_FILE="$REPO_DIR/.claude/routines/issue-implementer.md"
@@ -47,7 +48,8 @@ ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
 
 # Cleanup: if no changes were made, remove the worktree
 cd "$REPO_DIR"
-if git -C "$WORKTREE" diff --quiet && git -C "$WORKTREE" diff --cached --quiet; then
+COMMITS_AHEAD=$(git -C "$WORKTREE" rev-list origin/main..HEAD --count)
+if [ "$COMMITS_AHEAD" -eq 0 ] && git -C "$WORKTREE" diff --quiet && git -C "$WORKTREE" diff --cached --quiet; then
   echo "$(date): No changes made, cleaning up worktree" >> "$LOG_FILE"
   git worktree remove "$WORKTREE" --force
   git branch -d "$BRANCH" 2>/dev/null || true

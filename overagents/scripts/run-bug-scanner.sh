@@ -3,6 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_DIR="$SCRIPT_DIR"
+mkdir -p "$REPO_DIR/logs"
 LOG_FILE="$REPO_DIR/logs/bug-scanner.log"
 LOCK_FILE="/tmp/dev-loop-bug-scanner.lock"
 PROMPT_FILE="$REPO_DIR/.claude/routines/bug-scanner.md"

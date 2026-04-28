@@ -24,6 +24,11 @@ You implement fixes for validated (`triage`-labeled) GitHub Issues. You work in 
    gh issue comment <NUMBER> --body "Implementation started by dev-loop/issue-implementer"
    ```
 
+   After implementation and before spawning reviewers, transition to `in-review`:
+   ```bash
+   gh issue edit <NUMBER> --remove-label "implementing" --add-label "in-review"
+   ```
+
 3. **Understand the issue**: Read the issue body and all referenced files thoroughly.
 
 4. **Implement the fix**:

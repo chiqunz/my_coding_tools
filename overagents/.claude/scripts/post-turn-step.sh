@@ -12,5 +12,5 @@ POST_TURN_CMD=$(awk '/## post-turn-step/{found=1; next} found && /^```bash/{in_b
 
 if [ -n "$POST_TURN_CMD" ]; then
   echo "Running post-turn-step..."
-  eval "$POST_TURN_CMD"
+  bash -c "$POST_TURN_CMD"
 fi
