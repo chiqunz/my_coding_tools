@@ -51,11 +51,7 @@ curl -sf http://localhost:4000/health/liveness && echo "OK"
 ```
 
 The scripts look for the mai-agents `.env` file at `~/Work/Repo/mai-agents/.run/.env-*` by default.
-If your mai-agents checkout is elsewhere, set `MAI_AGENTS_DIR`:
-
-```bash
-export MAI_AGENTS_DIR=/path/to/your/mai-agents
-```
+If yours is elsewhere, set `MAI_AGENTS_DIR` in your environment or at the top of each script.
 
 ### 4. Verify everything works
 
@@ -99,7 +95,7 @@ cd /path/to/your-repo
 30 * * * * cd /path/to/your-repo && ./scripts/run-implement.sh
 ```
 
-If your mai-agents is not at the default path, add `MAI_AGENTS_DIR=/your/path` before each command.
+If your mai-agents is not at the default path (`~/Work/Repo/mai-agents`), set `MAI_AGENTS_DIR` before each command.
 
 ## How It Works
 
