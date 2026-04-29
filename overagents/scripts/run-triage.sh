@@ -8,6 +8,19 @@ LOG_FILE="$REPO_DIR/logs/triage.log"
 LOCK_FILE="/tmp/dev-loop-triage.lock"
 PROMPT_FILE="$REPO_DIR/.claude/routines/issue-validator.md"
 
+# Source LiteLLM proxy config from mai-agents
+# Set MAI_AGENTS_DIR to your mai-agents checkout, or it defaults to ~/Work/Repo/mai-agents
+MAI_AGENTS_DIR="${MAI_AGENTS_DIR:-$HOME/Work/Repo/mai-agents}"
+MAI_ENV_FILE="$(ls "$MAI_AGENTS_DIR"/.run/.env-* 2>/dev/null | head -1)"
+if [ -z "$MAI_ENV_FILE" ] || [ ! -f "$MAI_ENV_FILE" ]; then
+  echo "Error: mai-agents .env file not found at $MAI_AGENTS_DIR/.run/" >&2
+  echo "Run mai-agents/setup.sh first, or set MAI_AGENTS_DIR to your mai-agents path." >&2
+  exit 1
+fi
+set -a; source "$MAI_ENV_FILE"; set +a
+export ANTHROPIC_BASE_URL="${LITELLM_PROXY_URL}"
+export ANTHROPIC_API_KEY="${LITELLM_API_KEY}"
+
 # Prevent concurrent runs
 exec 9>"$LOCK_FILE"
 flock -n 9 || { echo "$(date): triage already running, skipping" >> "$LOG_FILE"; exit 0; }
@@ -22,8 +35,7 @@ git checkout main
 git pull origin main
 
 # Run the agent
-ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
-  claude -p "$(cat "$PROMPT_FILE")" \
+claude -p "$(cat "$PROMPT_FILE")" \
   --dangerously-skip-permissions \
   >> "$LOG_FILE" 2>&1
 

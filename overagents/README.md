@@ -1,6 +1,105 @@
 # dev-loop
 
-AI-driven development loop: automated bug discovery, prompt auditing, issue triage, and implementation — fully driven by `claude -p` + cron, billed via Anthropic API.
+AI-driven development loop: automated bug discovery, prompt auditing, issue triage, and implementation — fully driven by `claude -p` + cron.
+
+## Quick Start
+
+### 1. Prerequisites
+
+- **Claude Code CLI** (`claude`) — installed and on PATH
+- **LiteLLM proxy** — running via [mai-agents](https://github.com/infinity-microsoft/mai-agents) `setup.sh`
+- **GitHub CLI** (`gh`) — authenticated with read/write access to issues and PRs
+- **jq** — for JSON parsing in shell scripts
+- **flock** — for concurrency locking (`brew install flock` on macOS)
+
+### 2. Copy the plugin into your target repo
+
+```bash
+cd /path/to/your-repo          # e.g. ~/Work/Repo/maibot
+
+# Copy both directories
+cp -r /path/to/overagents/.claude .claude
+cp -r /path/to/overagents/scripts scripts
+
+# Create logs directory
+mkdir -p logs
+
+# Make scripts executable
+chmod +x scripts/*.sh .claude/scripts/*.sh
+```
+
+Your repo should now have:
+
+```
+your-repo/
+├── .claude/          # Agent definitions, routines, hooks, skills
+├── scripts/          # Shell scripts to run each stage
+└── logs/             # Created above, populated at runtime
+```
+
+### 3. Make sure LiteLLM proxy is running
+
+The scripts use your [mai-agents](https://github.com/infinity-microsoft/mai-agents) LiteLLM proxy — no Anthropic API key needed.
+
+```bash
+# If you haven't already, run mai-agents setup
+cd ~/Work/Repo/mai-agents
+./setup.sh
+
+# Verify the proxy is healthy
+curl -sf http://localhost:4000/health/liveness && echo "OK"
+```
+
+The scripts look for the mai-agents `.env` file at `~/Work/Repo/mai-agents/.run/.env-*` by default.
+If your mai-agents checkout is elsewhere, set `MAI_AGENTS_DIR`:
+
+```bash
+export MAI_AGENTS_DIR=/path/to/your/mai-agents
+```
+
+### 4. Verify everything works
+
+```bash
+cd /path/to/your-repo
+
+# Check prerequisites
+gh auth status
+claude --version
+echo '{"test":true}' | jq .
+
+# Smoke test — run triage (safe, read-only if no issues exist)
+./scripts/run-triage.sh
+tail -f logs/triage.log
+```
+
+### 5. Run stages manually
+
+```bash
+cd /path/to/your-repo
+
+./scripts/run-bug-scanner.sh      # Stage 1: discover bugs
+./scripts/run-prompt-auditor.sh   # Stage 2: audit prompts
+./scripts/run-triage.sh           # Stage 3: validate pending issues
+./scripts/run-implement.sh        # Stage 4: implement next triage issue
+```
+
+### 6. (Optional) Schedule with cron
+
+```cron
+# Stage 1: Bug scanner — nightly at 2 AM
+0 2 * * * cd /path/to/your-repo && ./scripts/run-bug-scanner.sh
+
+# Stage 2: Prompt auditor — nightly at 3 AM
+0 3 * * * cd /path/to/your-repo && ./scripts/run-prompt-auditor.sh
+
+# Stage 3: Triage / validator — every hour on the hour
+0 * * * * cd /path/to/your-repo && ./scripts/run-triage.sh
+
+# Stage 4: Implementer — every hour at :30
+30 * * * * cd /path/to/your-repo && ./scripts/run-implement.sh
+```
+
+If your mai-agents is not at the default path, add `MAI_AGENTS_DIR=/your/path` before each command.
 
 ## How It Works
 
@@ -36,7 +135,15 @@ Pulls all `auto-discovered` issues, re-reads the referenced code with fresh cont
 
 ### Stage 4: Issue Implementer (hourly, offset by 30min)
 
-Picks the oldest `triage` issue, implements a fix in an isolated git worktree, then spawns 5 parallel code-reviewer subagents (correctness, security, style, test coverage, breaking changes). If 3/5 approve, a PR is opened automatically.
+Picks the oldest `triage` issue and implements a fix in an isolated git worktree. Before creating a PR, it MUST:
+
+1. **Update documentation** if any public API, config, or behavior changed
+2. **Run the full test suite** and ensure all tests pass
+3. **Spawn 5 parallel code-reviewer subagents** (correctness, security, style, test coverage, breaking changes)
+4. **Pass majority vote** — 3/5 reviewers must approve to create a PR
+5. **Wait for CI to pass** before merging — if CI fails, the issue is labeled `needs-human-review`
+
+If any gate fails, the PR is NOT created/merged and the issue is flagged for human review.
 
 ## Label State Machine
 
@@ -56,87 +163,20 @@ auto-discovered → triage → implementing → in-review → done
 | `in-review` | issue-implementer | 5x reviewers running |
 | `done` | issue-implementer | Complete |
 | `invalid` | issue-validator | Closed as not actionable |
-| `needs-human-review` | issue-implementer | Failed code review |
+| `needs-human-review` | issue-implementer | Failed code review or CI |
 
-## Prerequisites
+## Authentication
 
-- **Claude CLI** (`claude`) installed and available on PATH
-- **Anthropic API key** (`ANTHROPIC_API_KEY`) — all stages run via `claude -p` (headless mode), billed per token through the Anthropic Console
-- **GitHub CLI** (`gh`) authenticated with read/write access to issues and PRs
-- **jq** for JSON parsing in shell scripts
-- **flock** for concurrency locking (`brew install flock` on macOS)
+All scripts route through a **LiteLLM proxy** provided by [mai-agents](https://github.com/infinity-microsoft/mai-agents). No direct Anthropic API key is needed.
 
-## Setup
+Each script:
+1. Reads `LITELLM_PROXY_URL` and `LITELLM_API_KEY` from `$MAI_AGENTS_DIR/.run/.env-*`
+2. Exports them as `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY`
+3. Runs `claude -p` which connects to the local proxy
 
-```bash
-# 1. Clone or navigate to your target repo
-cd /path/to/your-repo
-
-# 2. Copy the dev-loop plugin into your repo
-cp -r /path/to/overagents/.claude .claude
-cp -r /path/to/overagents/scripts scripts
-mkdir -p logs
-
-# 3. Make scripts executable
-chmod +x scripts/*.sh .claude/scripts/*.sh
-
-# 4. Verify prerequisites
-gh auth status
-claude --version
-echo '{"test":true}' | jq .
-
-# 5. Smoke test (manual run)
-export ANTHROPIC_API_KEY=sk-ant-xxx
-./scripts/run-triage.sh
-tail -f logs/triage.log
-```
-
-## Cron Scheduling
-
-Add to your crontab (`crontab -e`):
-
-```cron
-# dev-loop pipeline (source API key from a secrets file)
-# Stage 1: Bug scanner — nightly at 2 AM
-0 2 * * * source /etc/dev-loop-secrets && /path/to/repo/scripts/run-bug-scanner.sh
-
-# Stage 2: Prompt auditor — nightly at 3 AM
-0 3 * * * source /etc/dev-loop-secrets && /path/to/repo/scripts/run-prompt-auditor.sh
-
-# Stage 3: Triage / validator — every hour on the hour
-0 * * * * source /etc/dev-loop-secrets && /path/to/repo/scripts/run-triage.sh
-
-# Stage 4: Implementer — every hour at :30
-30 * * * * source /etc/dev-loop-secrets && /path/to/repo/scripts/run-implement.sh
-```
-
-Create `/etc/dev-loop-secrets` with `export ANTHROPIC_API_KEY=sk-ant-xxx` and `chmod 600` it.
-
-### API Key Options
-
-```bash
-# Option A: source from a secrets file (recommended, shown above)
-0 2 * * * source /etc/dev-loop-secrets && /path/to/scripts/run-bug-scanner.sh
-
-# Option B: use a secrets manager wrapper
-0 2 * * * /path/to/scripts/load-secrets-and-run.sh bug-scanner
-
-# Option C: inline in crontab (not recommended — key visible in crontab)
-0 2 * * * ANTHROPIC_API_KEY=sk-ant-xxx /path/to/scripts/run-bug-scanner.sh
-```
-
-## Manual Execution
-
-Trigger any stage manually at any time:
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-xxx
-
-./scripts/run-bug-scanner.sh      # discover bugs
-./scripts/run-prompt-auditor.sh   # audit prompts
-./scripts/run-triage.sh           # validate pending issues
-./scripts/run-implement.sh        # implement next triage issue
-```
+| Variable | Default | Purpose |
+|---|---|---|
+| `MAI_AGENTS_DIR` | `~/Work/Repo/mai-agents` | Path to your mai-agents checkout |
 
 ## Observability
 
@@ -213,19 +253,14 @@ Discovery agents (bug-scanner, prompt-auditor) are capped at 5 new issues per ru
 
 Before creating any issue, agents semantically compare candidates against all open issues and PRs. This is judgment-based (not string matching) — Claude decides whether an existing item covers the same underlying problem.
 
-### Cost Estimates
+### Quality Gates (Issue Implementer)
 
-| Stage | Model | Est. cost/run |
-|---|---|---|
-| bug-scanner | Sonnet | $0.15–$0.60 |
-| prompt-auditor | Sonnet | $0.09–$0.30 |
-| issue-validator | Sonnet | $0.03–$0.09 |
-| issue-implementer | Opus | $0.80–$4.00 |
-| 5x code-reviewer | Sonnet | $0.06–$0.24 each |
+The implementer will NOT create a PR unless:
+1. Documentation is updated (if behavior changed)
+2. Full test suite passes
+3. 3 of 5 code reviewers approve
 
-**Estimated monthly total: ~$120–540** depending on repo size and activity.
-
-Set a spend cap in the [Anthropic Console](https://console.anthropic.com) under Settings → Billing → Spend Limits.
+The implementer will NOT merge a PR unless CI passes. Failed gates result in `needs-human-review` label.
 
 ## Worktree Isolation
 
@@ -250,10 +285,6 @@ npm run lint --fix
 npm run typecheck
 ```
 ```
-
-### Targeting a Different Repo
-
-Update the `REPO_DIR` variable at the top of each script in `scripts/`, or set it via environment variable.
 
 ### Adjusting Models
 
