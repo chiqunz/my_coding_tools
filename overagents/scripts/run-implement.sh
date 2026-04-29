@@ -57,7 +57,7 @@ echo "$(date): Created worktree at $WORKTREE (branch: $BRANCH)" >> "$LOG_FILE"
 cd "$WORKTREE"
 claude -p "$(cat "$PROMPT_FILE")" \
   --dangerously-skip-permissions \
-  >> "$LOG_FILE" 2>&1
+  2>&1 | tee -a "$LOG_FILE"
 
 # Cleanup: if no changes were made, remove the worktree
 cd "$REPO_DIR"

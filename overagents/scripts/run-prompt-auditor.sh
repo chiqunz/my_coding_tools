@@ -38,6 +38,6 @@ git pull origin main
 # Run the agent
 claude -p "$(cat "$PROMPT_FILE")" \
   --dangerously-skip-permissions \
-  >> "$LOG_FILE" 2>&1
+  2>&1 | tee -a "$LOG_FILE"
 
 echo "$(date): prompt-auditor complete" >> "$LOG_FILE"
