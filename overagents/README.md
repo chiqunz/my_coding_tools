@@ -10,7 +10,7 @@ AI-driven development loop: automated bug discovery, prompt auditing, issue tria
 - **LiteLLM proxy** — running via [mai-agents](https://github.com/infinity-microsoft/mai-agents) `setup.sh`
 - **GitHub CLI** (`gh`) — authenticated with read/write access to issues and PRs
 - **jq** — for JSON parsing in shell scripts
-- **flock** — for concurrency locking (`brew install flock` on macOS)
+- No `flock` needed — scripts use `mkdir`-based locking (works natively on macOS and Linux)
 
 ### 2. Copy the plugin into your target repo
 
@@ -236,7 +236,7 @@ logs/                            # Created at runtime
 
 ### Concurrency
 
-Every script uses `flock` to prevent overlapping runs. If a stage is already running when cron fires again, the new invocation exits immediately.
+Every script uses `mkdir` as an atomic lock to prevent overlapping runs. If a stage is already running when cron fires again, the new invocation exits immediately. The lock is automatically cleaned up on exit.
 
 ### Idempotency
 

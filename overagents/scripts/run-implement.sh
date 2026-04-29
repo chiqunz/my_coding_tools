@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_DIR="$SCRIPT_DIR"
 mkdir -p "$REPO_DIR/logs"
 LOG_FILE="$REPO_DIR/logs/implement.log"
-LOCK_FILE="/tmp/dev-loop-implement.lock"
+LOCK_DIR="/tmp/dev-loop-implement.lock"
 PROMPT_FILE="$REPO_DIR/.claude/routines/issue-implementer.md"
 WORKTREE_BASE="$REPO_DIR/../worktrees"
 
@@ -22,9 +22,10 @@ set -a; source "$MAI_ENV_FILE"; set +a
 export ANTHROPIC_BASE_URL="${LITELLM_PROXY_URL}"
 export ANTHROPIC_API_KEY="${LITELLM_API_KEY}"
 
-# Prevent concurrent runs
-exec 9>"$LOCK_FILE"
-flock -n 9 || { echo "$(date): implementer already running, skipping" >> "$LOG_FILE"; exit 0; }
+# Prevent concurrent runs (mkdir is atomic, works on macOS without flock)
+cleanup_lock() { rmdir "$LOCK_DIR" 2>/dev/null; }
+trap cleanup_lock EXIT
+mkdir "$LOCK_DIR" 2>/dev/null || { echo "$(date): implementer already running, skipping" >> "$LOG_FILE"; exit 0; }
 
 echo "$(date): Starting issue-implementer" >> "$LOG_FILE"
 
